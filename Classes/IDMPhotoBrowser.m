@@ -21,6 +21,8 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 @interface IDMPhotoBrowser () {
 	// Data
     NSMutableArray *_photos;
+    
+    UIView * _backgroundView;
 
 	// Views
 	UIScrollView *_pagingScrollView;
@@ -198,7 +200,6 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 		self.modalPresentationStyle = UIModalPresentationCustom;
 		self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
 		self.modalPresentationCapturesStatusBarAppearance = YES;
-		self.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
 
         // Listen for IDMPhoto notifications
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -220,7 +221,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 - (id)initWithPhotos:(NSArray *)photosArray animatedFromView:(UIView*)view {
     if ((self = [self init])) {
 		_photos = [[NSMutableArray alloc] initWithArray:photosArray];
-        _senderViewForAnimation = view;
+        _senderViewForAnimation = nil;
 	}
 	return self;
 }
@@ -237,7 +238,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
     if ((self = [self init])) {
         NSArray *photosArray = [IDMPhoto photosWithURLs:photoURLsArray];
 		_photos = [[NSMutableArray alloc] initWithArray:photosArray];
-        _senderViewForAnimation = view;
+        _senderViewForAnimation = nil;
 	}
 	return self;
 }
@@ -296,7 +297,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 
     self.view.opaque = YES;
 
-    self.view.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:newAlpha];
+    _backgroundView.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:newAlpha];
 
     // Gesture Ended
     if ([(UIPanGestureRecognizer*)sender state] == UIGestureRecognizerStateEnded) {
@@ -311,7 +312,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 
             CGFloat windowsHeigt = [_applicationWindow frame].size.height;
 
-            if(scrollView.center.y > viewHalfHeight+30) // swipe down
+            if(scrollView.center.y > viewHalfHeight+40) // swipe down
                 finalY = windowsHeigt*2;
             else // swipe up
                 finalY = -viewHalfHeight;
@@ -323,17 +324,19 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
             [UIView setAnimationCurve:UIViewAnimationCurveEaseIn];
             [UIView setAnimationDelegate:self];
             [scrollView setCenter:CGPointMake(finalX, finalY)];
-            self.view.backgroundColor = [UIColor colorWithWhite:0 alpha:0];
+            _backgroundView.backgroundColor = [UIColor colorWithWhite:0 alpha:0];
+            scrollView.alpha = 0;
             [UIView commitAnimations];
-
-            [self performSelector:@selector(doneButtonPressed:) withObject:self afterDelay:animationDuration];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(animationDuration * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [self dismissPhotoBrowserAnimated:NO];
+            });
         }
         else // Continue Showing View
         {
             _isdraggingPhoto = NO;
             [self setNeedsStatusBarAppearanceUpdate];
 
-            self.view.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:1];
+            _backgroundView.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:1];
 
             CGFloat velocityY = (.35*[(UIPanGestureRecognizer*)sender velocityInView:self.view].y);
 
@@ -442,10 +445,11 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
         [self prepareForClosePhotoBrowser];
         [self dismissPhotoBrowserAnimated:NO];
     };
+    
 
     [UIView animateWithDuration:_animationDuration animations:^{
         fadeView.alpha = 0;
-        self.view.backgroundColor = [UIColor clearColor];
+        _backgroundView.backgroundColor = [UIColor clearColor];
     } completion:nil];
 
     CGRect senderViewOriginalFrame = _senderViewForAnimation.superview ? [_senderViewForAnimation.superview convertRect:_senderViewForAnimation.frame toView:nil] : _senderViewOriginalFrame;
@@ -566,10 +570,18 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 #pragma mark - View Lifecycle
 
 - (void)viewDidLoad {
+    
+    _backgroundView = [[UIView alloc] initWithFrame:self.view.frame];
+    [self.view addSubview:_backgroundView];
+    _backgroundView.autoresizingMask = 0xff;
+    
     // View
 	self.view.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:1];
+    
+    _backgroundView.backgroundColor = [UIColor colorWithWhite:(_useWhiteBackgroundColor ? 1 : 0) alpha:1];
 
     self.view.clipsToBounds = YES;
+    _backgroundView.clipsToBounds = YES;
 
 	// Setup paging scrolling view
 	CGRect pagingScrollViewFrame = [self frameForPagingScrollView];
@@ -581,7 +593,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
 	_pagingScrollView.backgroundColor = [UIColor clearColor];
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
-	[self.view addSubview:_pagingScrollView];
+	[_backgroundView addSubview:_pagingScrollView];
 
     // Transition animation
     [self performPresentAnimation];
@@ -1300,8 +1312,8 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
     }
     else {
         _senderViewForAnimation.hidden = NO;
-        [self prepareForClosePhotoBrowser];
-        [self dismissPhotoBrowserAnimated:YES];
+//        [self prepareForClosePhotoBrowser];
+        [self dismissPhotoBrowserAnimated:NO];
     }
 }
 
