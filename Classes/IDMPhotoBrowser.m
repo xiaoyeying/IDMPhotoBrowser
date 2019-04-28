@@ -1213,6 +1213,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView  {
     // Checks
     if (!_viewIsActive || _performingLayout || _rotating) return;
+    _isdraggingPhoto = YES;
     
     // Tile pages
     [self tilePages];
@@ -1240,6 +1241,7 @@ NSLocalizedStringFromTableInBundle((key), nil, [NSBundle bundleWithPath:[[NSBund
 
 - (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
     // Update toolbar when page changes
+    _isdraggingPhoto = NO;
     if(! _arrowButtonsChangePhotosAnimated) [self updateToolbar];
 }
 
